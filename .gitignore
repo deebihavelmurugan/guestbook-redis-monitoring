@@ -1,0 +1,6 @@
+node_modules/
+.pulumi/
+*.backup
+.env
+.env.*
+.DS_Store

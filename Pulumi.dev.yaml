@@ -1,0 +1,5 @@
+encryptionsalt: v1:3HziIzcI43A=:v1:LpIr/Xlmj8TJ4Vxa:kksE+YFlTHV5s+6ZaAr5/iH523tlpg==
+config:
+  guestbook-easy:isMinikube: "false"
+  guestbook-easy:grafanaAdminPassword:
+    secure: v1:soAC67kgCzM7HVpj:j8ortB40IXfnznGwNFxEajHNph1XgKVW
