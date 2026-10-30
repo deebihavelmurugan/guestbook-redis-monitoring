@@ -2,73 +2,70 @@
 
 ## Overview
 
-This project deploys a Kubernetes-based Guestbook application backed by Redis and integrates Prometheus and Grafana for monitoring and observability.
+This project deploys a Kubernetes Guestbook application using Pulumi and TypeScript and extends it with Redis monitoring using Prometheus, Redis Exporter, and Grafana.
 
-The infrastructure is provisioned and managed using **Pulumi with TypeScript**, while Helm is used to deploy the monitoring components.
-
-The goal is to demonstrate Kubernetes application deployment, infrastructure as code, Redis monitoring, and metrics visualization.
+The infrastructure is deployed declaratively using Pulumi. Prometheus collects Redis metrics exposed by Redis Exporter, and Grafana visualizes those metrics through a dashboard.
 
 ## Architecture
 
-The project consists of the following components:
+The solution includes:
 
-| Component | Description |
-|---|---|
-| Guestbook | Frontend application deployed with 3 replicas |
-| Redis Leader | Primary Redis instance |
-| Redis Replica | Redis replica instance |
-| Redis Exporter | Exposes Redis metrics for Prometheus |
-| Prometheus | Collects and stores monitoring metrics |
-| Grafana | Displays Redis metrics through dashboards |
+- **Guestbook Frontend:** Three frontend replicas.
+- **Redis Leader:** Stores Guestbook entries.
+- **Redis Replica:** Handles read operations.
+- **Redis Exporter:** Exposes Redis performance metrics for Prometheus.
+- **Prometheus:** Scrapes and stores Redis Exporter metrics.
+- **Grafana:** Visualizes Redis metrics using a monitoring dashboard.
 
-### Monitoring Data Flow
+### Monitoring flow
 
-1. Redis runs as the application's data store.
-2. Redis Exporter collects and exposes Redis metrics on port `9121`.
-3. Prometheus scrapes metrics from Redis Exporter.
-4. Grafana uses Prometheus as its data source.
-5. Redis metrics are visualized through a Grafana dashboard.
+Redis → Redis Exporter → Prometheus → Grafana
 
 ## Technology Stack
 
-- Kubernetes
-- Docker Desktop
 - Pulumi
 - TypeScript
+- Kubernetes
 - Redis
 - Redis Exporter
 - Prometheus
 - Grafana
 - Helm
 
-## Grafana Dashboard
-
-The Grafana dashboard provides visibility into Redis performance through the following metrics:
-
-- **Connected Clients:** Number of clients currently connected to Redis.
-- **Memory Usage:** Memory consumed by the Redis instance.
-- **Commands Per Second:** Redis command processing rate over time.
-
-## Project Screenshots
-
-### Grafana Redis Monitoring Dashboard
-
-![Grafana Redis Dashboard](screenshots/grafana-dashboard.png)
-
-### Prometheus Targets
-
-![Prometheus Targets](screenshots/prometheus-targets.png)
-
 ## Prerequisites
 
-Before deploying the project, make sure you have:
+Before deploying, ensure the following tools are installed and configured:
 
-- Docker Desktop with Kubernetes enabled
-- Node.js and npm
-- Pulumi CLI
+- Docker Desktop with Kubernetes enabled, or another Kubernetes cluster
 - kubectl
+- Pulumi CLI
+- Node.js and npm
 
-## Deployment
+Verify Kubernetes connectivity:
+
+```bash
+kubectl get nodes
+```
+
+## Project Structure
+
+```text
+.
+├── index.ts
+├── k8sjs.ts
+├── Pulumi.yaml
+├── Pulumi.dev.yaml
+├── package.json
+├── package-lock.json
+├── tsconfig.json
+├── imgs/
+│   └── guestbook.png
+└── screenshots/
+    ├── grafana-dashboard.png
+    └── prometheus-targets.png
+```
+
+## Deployment Instructions
 
 ### 1. Clone the repository
 
@@ -83,13 +80,7 @@ cd guestbook-redis-monitoring
 npm install
 ```
 
-### 3. Initialize Pulumi
-
-The project uses the local Pulumi backend.
-
-```bash
-pulumi login --local
-```
+### 3. Configure Pulumi
 
 Select the development stack:
 
@@ -97,7 +88,29 @@ Select the development stack:
 pulumi stack select dev
 ```
 
+This project was tested using Pulumi's local backend. If using the local backend, initialize it with:
+
+```bash
+pulumi login --local
+```
+
+The project uses encrypted Pulumi configuration for the Grafana administrator password. Configure the secret for your own environment if needed:
+
+```bash
+pulumi config set --secret grafanaAdminPassword YOUR_PASSWORD
+```
+
+Do not commit plaintext passwords, access tokens, or Pulumi passphrases.
+
 ### 4. Deploy the infrastructure
+
+Preview the deployment:
+
+```bash
+pulumi preview
+```
+
+Deploy:
 
 ```bash
 pulumi up
@@ -107,56 +120,132 @@ Review the proposed changes and confirm the deployment.
 
 ### 5. Verify Kubernetes resources
 
-Check the deployed pods:
+```bash
+kubectl get pods -A
+kubectl get services -A
+kubectl get deployments -A
+```
+
+Verify that the Guestbook, Redis, Redis Exporter, Prometheus, and Grafana resources are running.
+
+## Accessing the Guestbook
+
+Forward the frontend service port:
 
 ```bash
-kubectl get pods --all-namespaces
+kubectl port-forward svc/frontend 8765:80
 ```
 
-Check services:
+Open the application:
+
+http://localhost:8765
+
+## Accessing Grafana
+
+Grafana is available locally through Kubernetes port forwarding.
+
+Start the port-forward:
 
 ```bash
-kubectl get services --all-namespaces
+kubectl port-forward svc/guestbook-grafana 3000:80 -n monitoring
 ```
 
-## Validation
+Open Grafana:
 
-The monitoring setup can be validated by checking:
+**URL:** http://localhost:3000
 
-- Redis Exporter is running.
-- The `redis_up` metric returns a value of `1`.
-- Prometheus shows the Redis Exporter target as **UP**.
-- Grafana successfully queries Prometheus.
-- The Grafana dashboard displays Redis metrics.
+**Username:** `admin`
 
-## Repository Structure
+**Password:** The Grafana administrator password configured through Pulumi encrypted configuration. Retrieve it from your own Pulumi environment:
 
-```text
-components/
-├── index.ts
-├── k8sjs.ts
-├── package.json
-├── package-lock.json
-├── tsconfig.json
-├── Pulumi.yaml
-├── Pulumi.dev.yaml
-├── README.md
-├── .gitignore
-└── screenshots/
-    ├── grafana-dashboard.png
-    └── prometheus-targets.png
+```bash
+pulumi config get guestbook-easy:grafanaAdminPassword --show-secrets
 ```
+
+The password should be shared with the assessment reviewer separately through a secure channel, not committed to this repository.
+
+## Prometheus Verification
+
+Forward the Prometheus service:
+
+```bash
+kubectl port-forward svc/guestbook-prometheus-server 9090:80 -n monitoring
+```
+
+Open Prometheus:
+
+http://localhost:9090
+
+### Verify Redis Exporter target
+
+Navigate to:
+
+http://localhost:9090/targets
+
+Confirm that the `redis-exporter` target is in the **UP** state.
+
+### Verify Redis metrics
+
+In the Prometheus query interface, execute:
+
+```promql
+redis_up
+```
+
+An output value of `1` indicates that Redis Exporter can successfully collect Redis metrics.
+
+Other useful queries:
+
+**Connected Redis clients**
+
+```promql
+redis_connected_clients
+```
+
+**Redis memory usage**
+
+```promql
+redis_memory_used_bytes
+```
+
+**Redis commands processed per second**
+
+```promql
+rate(redis_commands_processed_total[5m])
+```
+
+**Note:** The current monitoring implementation collects Redis metrics through Redis Exporter. It does not currently expose or scrape application-level metrics directly from the Guestbook frontend.
+
+## Grafana Dashboard
+
+The Grafana dashboard visualizes Redis performance metrics, including:
+
+1. Connected Clients
+2. Memory Usage
+3. Commands Per Second
+
+### Dashboard Screenshot
+
+![Grafana Dashboard](screenshots/grafana-dashboard.png)
+
+### Prometheus Targets Screenshot
+
+![Prometheus Targets](screenshots/prometheus-targets.png)
 
 ## Cleanup
 
-To remove the resources created by Pulumi:
+To remove the deployed resources:
 
 ```bash
 pulumi destroy
 ```
 
-Review the proposed changes and confirm before deleting resources.
+Review and confirm the destruction when prompted.
 
----
+## Reference
 
-**Project Focus:** Kubernetes deployment, infrastructure as code, Redis administration, Prometheus monitoring, Grafana dashboards, and observability.
+The Guestbook application is based on the Pulumi Kubernetes TypeScript Guestbook example:
+
+https://github.com/pulumi/examples/tree/master/kubernetes-ts-guestbook
+
+This project extends the example with Redis Exporter, Prometheus, and Grafana monitoring.
